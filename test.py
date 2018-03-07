@@ -1,3 +1,12 @@
+from lib import Client
+import pprint
+
+pp = pprint.PrettyPrinter(indent=4)
+client = Client("Luca", "test")
+
+pp.pprint(client.registration_first_message())
+
+"""
 from lib import Scram
 from lib import DH
 import binascii
@@ -96,3 +105,4 @@ server_final_message = {
 client_server_signature = binascii.hexlify(client_scram.signature_generation(client_server_key, client_auth_message))
 
 client_verification_message = client_scram.client_final_verification(client_server_signature, server_final_message['server_signature'])
+"""

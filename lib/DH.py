@@ -29,7 +29,7 @@ class DH(object):
         """
         generates shared secret g^a mod p
         """
-        return hex(pow(self.G, self.__a, self.P))
+        return pow(self.G, self.__a, self.P)
 
     def shared_secret(self, other_key):
         """
