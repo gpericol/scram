@@ -43,6 +43,3 @@ class DH(object):
             return hashlib.sha256(str(pow(other_key, self.__a, self.P)).encode()).digest()
 
         raise Exception("Bad other_key")
-
-
-        

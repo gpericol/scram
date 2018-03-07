@@ -30,43 +30,28 @@ class Scram(object):
     def stored_key_generation(self, client_key):
         return hashlib.sha256(client_key).hexdigest()
 
+    def auth_message_generation(self, username, client_nonce, salt, ic, server_nonce):
+        return binascii.hexlify(username+client_nonce+salt+ic+server_nonce)
 
+    def signature_generation(self, stored_key, auth_message):
+        keyed_hash_mac = hmac.new(stored_key, digestmod=hashlib.sha256)
+        keyed_hash_mac.update(auth_message)
+        return keyed_hash_mac.digest()
 
-
-
-    def client_signature_generation(stored_key, client_first_message, client_final_message_without_proof, server_first_message):
-        auth_message = client_first_message[3:]+','+server_first_message+','+client_final_message_without_proof
-        keyed_hash_mac2 = hmac.new(stored_key, digestmod=hashlib.sha1)
-        keyed_hash_mac2.update(str(auth_message).encode('utf-8'))
-        client_signature = keyed_hash_mac2.digest()
-        return client_signature
-
-    def client_final_message_without_proof(storage_client):
-        storage_client['client_final_message_without_proof']='c='+str(base64.standard_b64encode(str.encode(Gs2Header())))+','+'r='+storage_client['client_first_message'].rsplit('r=', 1)[1]
-        return storage_client
-
+    def client_proof_generation(self, client_key, client_signature):
+        return binascii.hexlify(self.bitwise_xor(client_key, client_signature))
     
-
-    def client_final_message(client_key, client_signature, storage_client):
-        storage_client=client_final_message_without_proof(storage_client)
-        client_proof = base64.b64encode(Xor(client_key, client_signature))
-        storage_client['client_final_message']=storage_client['client_final_message_without_proof']+','+'p='+client_proof.decode(encoding='UTF-8')
-        return storage_client
-
-    def server_signature_generation(server_key, client_first_message, client_final_message_without_proof, server_first_message):
-        auth_message = client_first_message[3:]+','+server_first_message+','+client_final_message_without_proof
-        keyed_hash_mac2 = hmac.new(server_key, digestmod=hashlib.sha1)
-        keyed_hash_mac2.update(str(auth_message).encode('utf-8'))
-        server_signature = keyed_hash_mac2.digest()
-        return server_signature
-
-    def server_final_message(stored_key, server_signature, client_proof_from_client, client_signature, storage_server):
-        temp_client_key= Xor(base64.b64decode(client_proof_from_client.encode(encoding='UTF-8')), client_signature)
-        sha1 = hashlib.sha1(temp_client_key)
-        temp_stored_key = sha1.digest()
-        if temp_stored_key == stored_key:
-            storage_server['server_final_message'] = 'v='+base64.b64encode(server_signature).decode(encoding='utf-8')
-            return storage_server
+    def server_final_verification(self, client_stored_key, server_stored_key):
+        if client_stored_key == server_stored_key:
+            print "Authentication with client OK"
         else:
-            storage_server['server_final_message'] = 'e='+'error' #TODO Expand errors
-            return storage_server
+            print "Verification failed"
+
+    def client_final_verification(self, client_server_signature, server_server_signature):
+        if client_server_signature == server_server_signature:
+            print "Authentication with server OK"
+        else:
+            print "Verification failed"
+        
+            
+
