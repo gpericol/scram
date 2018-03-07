@@ -3,7 +3,7 @@ from DH import DH
 import binascii
 
 class Server(object):
-    TTL: 10
+    TTL = 10
     IC = 4096
     __sessions = None
     __data = None
@@ -27,7 +27,10 @@ class Server(object):
         }
         return self.__sessions['username']
 
-    def registration_first_message(self, client_first_message):
+    def _save_record(self, username, keys):
+        self.__data['username'] = keys
+
+    def registration_pairing(self, client_first_message):
         if self._get_session(username):
             raise Exception("Session error")
 
@@ -47,6 +50,28 @@ class Server(object):
             "nonce": self.__scram.nonce()
         }
 
+    def registration_share_keys(self, msg):
+        session = self._get_session(msg['username'])
         
+        crypted_password = binascii.unhexlify(msg['secret_key'])
+        salted_password = server_scram.bitwise_xor(crypted_password, session['shared_key'])
         
+        client_key = self.__scram.nonce()
+        server_key = self.__scram.nonce()
 
+        server_client_key = self.__scram.hmac_generation(salted_password, binascii.unhexlify(client_key))
+        server_server_key = self.__scram.hmac_generation(salted_password, binascii.unhexlify(server_key))
+        
+        server_stored_key = server_scram.stored_key_generation(server_client_key)
+
+        self._save_record(msg['username'], {
+            "stored_key" = server_stored_key,
+            "server_key" = binascii.hexlify(server_server_key),
+            "salt" = session['salt'],
+            "ic" = self.IC
+        })
+
+        return {
+            "server_key": binascii.hexlify(self.__scram.bitwise_xor(binascii.unhexlify(server_key), session['shared_key'])),
+            "client_key": binascii.hexlify(server_scram.bitwise_xor(binascii.unhexlify(client_key), session['shared_key']))
+        }
