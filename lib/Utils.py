@@ -2,31 +2,39 @@ import binascii
 import os
 import hmac
 import hashlib
+import uuid
 
 class Utils(object):
     
-    def __init__(self):
-        data = {}
-
-    def hex(self, data):
+    @staticmethod
+    def hex(data):
         return binascii.hexlify(data)
     
-    def unhex(self, data):
+    @staticmethod
+    def unhex(data):
         return binascii.unhexlify(data)
     
-    def hexed_sha256(self, data):
+    @staticmethod
+    def hexed_sha256(data):
         return hashlib.sha256(data).hexdigest()
 
-    def nonce(self, size):
-        return self.hex(os.urandom(size))
+    @staticmethod
+    def nonce(size):
+        return Utils.hex(os.urandom(size))
 
-    def bitwise_xor(self, arg1, arg2):
+    @staticmethod
+    def bitwise_xor(arg1, arg2):
         value = [ord(a) ^ ord(b) for a,b in zip(arg1,arg2)]
         return ''.join(chr(x) for x in value)
     
-    def hmac_generation(self, password, key):
+    @staticmethod
+    def hmac_generation(password, key):
         return hmac.new(password, key, digestmod=hashlib.sha256).digest()
 
-    def pbkdf2_hmac(self, password, salt, ic):
+    @staticmethod
+    def pbkdf2_hmac(password, salt, ic):
         return hashlib.pbkdf2_hmac('sha256', password, salt, ic)
 
+    @staticmethod
+    def generate_password():
+        return str(uuid.uuid4())
