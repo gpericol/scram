@@ -13,15 +13,15 @@ https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange
 ## Registration
 
 1. A Client sends its username, a random nonce and his public key to the Server
-2. The Server takes track of the Client's session storing its credentials. Then, it sends to the Client a random nonce, a random salt, an iteration count (4096) and its public key. Now both the parties have the shared secret key. 
-3. The Client generates salted passoword with PBKDF2+HMAC sending it to the server in an encrypted way ( XOR (salted_password, shared secret key) )
-4. The Server decrypt the salted password, generates 2 random nonces ("client key" and "server key") which will be sended in an encrypted way to the Client ( XOR ("client key"/"server key", shared secret key) ). These nonces will be used to generate the client key, the server key and the stored key from both the parties.
+2. The Server takes track of the Client's session, storing the received credentials. Then, it sends a random nonce, a random salt, an iteration count (4096) and its public key to the Client. Now both the parties have the shared secret key. 
+3. The Client generates the salted password with PBKDF2+HMAC sending it to the Server in an encrypted way ( XOR (salted_password, shared secret key) )
+4. The Server decrypts the salted password, generates 2 random nonces ("Client key" and "Server key") which will be sended in an encrypted way to the Client ( XOR ("Slient key"/"Server key", shared secret key) ). These nonces will be used to generate the Client key, the Server key and the stored key by both the parties.
 
 ## Authentication
 1. Both parties generate an authenticated message
-2. The client generates the client proof sending it with the authenticated message to the Server
-3. The server verifies the proof and it sends to the Client his signature
-4. The client verifies the Server signature
+2. The Client generates the Client proof and sends it with the authenticated message to the Server
+3. The Server verifies the proof and sends his signature to the Client
+4. The Client verifies the Server signature
 5. If all the checks are successful, ok, otherwise
 
 ![ ](https://memegenerator.net/img/instances/68189102/authentication-failed-you-shall-not-pass.jpg)
@@ -30,7 +30,7 @@ https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange
 
 ## Diffie Hellman
 
-We have decided to implement Diffie Hellman key exchange algorithm avoiding the user to use other libraries for the shared secret. Our DH library makes use of only the safe prime ( https://en.wikipedia.org/wiki/Safe_prime )
+We have decided to implement Diffie Hellman key exchange algorithm in SCRAM with the aim to avoiding the user to use other libraries for the shared secret. Our DH library makes use of the safe prime
 
 ```
 FFFFFFFF FFFFFFFF C90FDAA2 2168C234 C4C6628B 80DC1CD1
@@ -74,12 +74,17 @@ is to avoid to consider generators that generate subgroup of order 2 (i.e., 1 an
 The condition
 
 ```python
-pow(other_key, self.P - 1, self.P) == 1:
+pow(other_key, (self.P - 1) / 2, self.P) == 1:
 ```
 
-is used to prevent low-order element's weaknesses.
+is used to prevent low-order element's weaknesses. Note that 
 
-See 
+```python
+(self.P - 1) / 2
+```
+is due to the definition of safe prime ( https://en.wikipedia.org/wiki/Safe_prime ).
+
+For further information about these conditions, see
 
 https://crypto.stackexchange.com/questions/2131/how-should-i-check-the-received-ephemeral-diffie-hellman-public-keys
 
@@ -88,5 +93,5 @@ https://crypto.stackexchange.com/questions/2131/how-should-i-check-the-received-
 
 ## Scram
 
-We have added session feature so that the server can store Clients nonces with their relative timestamps with the aim to prevent possible attacks, such as replay attack. We have simplified some notation used in SCRAM RFC, while maintaining the original mechanism and purpose.
+We have added session feature so that the Server can store Clients nonces with their relative timestamps with the aim to prevent possible attacks, such as replay attack. We have simplified some notation used in SCRAM RFC, while maintaining the original mechanism and purpose.
 

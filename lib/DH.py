@@ -38,7 +38,7 @@ class DH(object):
         """
 
         other_key = long(other_key, 16)
-        if 2 <= other_key and other_key <= self.P - 2 and pow(other_key, self.P - 1, self.P) == 1:
+        if 2 <= other_key and other_key <= self.P - 2 and pow(other_key, (self.P - 1) / 2, self.P) == 1:
             return hashlib.sha256(str(pow(other_key, self.__a, self.P)).encode()).digest()
 
         raise Exception("Bad other_key")
