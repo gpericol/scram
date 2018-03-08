@@ -13,6 +13,9 @@ class Client(object):
     __salted_password = None
     __client_nonce = None
     __server_nonce = None
+    __salt = None
+    __ic = None
+    __auth_message = None
 
     __dh = None
 
@@ -39,7 +42,10 @@ class Client(object):
 
         self.__server_nonce = msg['server_nonce']
 
-        salted_password = Scram.salted_password(self.__password, msg['salt'], msg['ic'])
+        self.__salt = msg['salt']
+        self.__ic = msg['ic']
+
+        salted_password = Scram.salted_password(self.__password, self.__salt, self.__ic)
 
         secret_salted_password = Utils.bitwise_xor(salted_password, self.__shared_key)
 
@@ -52,7 +58,8 @@ class Client(object):
     
     def registration_keys_generation(self, msg):
 
-        # verifica nonce
+        if self.__client_nonce != msg['client_nonce']:
+            print "ERROR"
 
         client_key = Utils.bitwise_xor(Utils.unhex(msg['client_key']), self.__shared_key)
         server_key = Utils.bitwise_xor(Utils.unhex(msg['server_key']), self.__shared_key)
@@ -66,3 +73,21 @@ class Client(object):
             "client_key": Utils.hex(client_client_key),
             "stored_key": Utils.hex(client_stored_key)
         }
+
+    def authentication_client_proof_generation(self, msg): # msg is the returned value of registration_keys_generation
+
+        self.__auth_message = Scram.auth_message_generation(self.username, self.__client_nonce, self.__salt, self.__ic, self.__server_nonce)
+        client_signature = Scram.signature_generation(msg['stored_key'], self.__auth_message)
+        client_proof = Scram.client_proof_generation(msg['client_key'], client_signature)
+
+        return {
+                "username": self.username 
+                "auth_message": auth_message
+                "client_proof": client_proof
+            }
+
+    def server_authentication(self, msg, msg_from_server): # msg is the returned value of registration_keys_generation
+
+        if msg['message']:
+            server_signature = Utils.hex(Scram.signature_generation(msg['server_key'],self.__auth_message))
+            client_verification_message = client_scram.client_final_verification(server_signature, msg_from_server['server_signature'])

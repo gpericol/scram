@@ -3,8 +3,6 @@ from DH import DH
 from Utils import Utils
 import binascii
 
-
-
 # Pensare se ha senso implementare l'id di sessione con i 2 nonce
 class Server(object):
     TTL = 10
@@ -34,6 +32,8 @@ class Server(object):
     def _save_record(self, username, record):
         self.__data['username'] = record
 
+    # First possibility - Client-Server registration
+
     def registration_pairing(self, msg):
         if self._get_session(username):
             # session already exists
@@ -46,6 +46,11 @@ class Server(object):
         session['shared_key'] = self.__dh.shared_secret(msg['public_key'])
         session['server_nonce'] = Utils.nonce(32)
         session['salt'] = Utils.nonce(32)
+
+        self._save_record(msg['username'], {
+            "client_nonce": session['client_nonce'],
+            "server_nonce": session['server_nonce']
+        })
 
         return {
             "salt": session['salt'],
@@ -89,7 +94,22 @@ class Server(object):
         return return_value
 
 
-     def generate_user(self, username):
+    def client_authentication(self, msg):
+
+        auth_message = Scram.auth_message_generation(msg['username'], self.__data['username']['client_nonce'], self.__data['username']['salt'], self.__data['username']['ic'], self.__data['username']['server_nonce'])
+        client_signature = Scram.signature_generation(self.__data['username']['stored_key'], auth_message)
+        server_signature = Scram.signature_generation(self.__data['username']['server_key'], auth_message)
+
+        verification_message = Scram.server_final_verification(Scram.stored_key_generation(Utils.bitwise_xor(Utils.unhex(msg['client_proof']), client_signature)), self.__data['username']['stored_key'])
+
+        return {
+            "message": verification_message,
+            "server_signature": Utils.hex(server_signature)
+        }
+
+    # Second possibility - User generation by the Server
+
+    def generate_user(self, username):
         password = Utils.generate_password()
         salt = Utils.nonce(32)
         salted_password = Scram.salted_password(password, salt, self.IC)
@@ -99,7 +119,6 @@ class Server(object):
         server_server_key = Utils.hmac_generation(salted_password, Utils.unhex(server_key))
         stored_key = Scram.stored_key_generation(server_client_key)
 
-        #save record
         record = {
             "stored_key": stored_key,
             "server_key": Utils.hex(server_server_key),

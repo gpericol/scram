@@ -27,16 +27,16 @@ class Scram(object):
     @staticmethod
     def server_final_verification(client_stored_key, server_stored_key):
         if client_stored_key == server_stored_key:
-            print "Authentication with client OK"
+            return True
         else:
-            print "Verification failed"
+            return False
     
     @staticmethod
     def client_final_verification(client_server_signature, server_server_signature):
         if client_server_signature == server_server_signature:
-            print "Authentication with server OK"
+            return True
         else:
-            print "Verification failed"
+            return False
         
             
 

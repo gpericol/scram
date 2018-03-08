@@ -1,8 +1,12 @@
-# Diffie Hellman - Salted Challenge Response Authentication Message
+# Salted Challenge Response Authentication Message - SHA 256 feat. Diffie Hellman
 
-A modified version of SCRAM Authentication 
+#### Gianluca Pericoli, Luca Zanolini
+
+A modified version of SCRAM-SHA256 Authentication 
 
 https://wiki.tools.ietf.org/html/rfc5802 
+
+https://tools.ietf.org/html/rfc7677
 
 with Diffie Hellman key exchange
 
@@ -12,10 +16,20 @@ https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange
 
 ## Registration
 
+### First possibility - Client-Server registration
+
 1. A Client sends its username, a random nonce and his public key to the Server
 2. The Server takes track of the Client's session, storing the received credentials. Then, it sends a random nonce, a random salt, an iteration count (4096) and its public key to the Client. Now both the parties have the shared secret key. 
-3. The Client generates the salted password with PBKDF2+HMAC sending it to the Server in an encrypted way ( XOR (salted_password, shared secret key) )
+3. The Client generates the salted password with PBKDF2+HMAC algorithm sending it to the Server in an encrypted way ( XOR (salted_password, shared secret key) )
 4. The Server decrypts the salted password, generates 2 random nonces ("Client key" and "Server key") which will be sended in an encrypted way to the Client ( XOR ("Slient key"/"Server key", shared secret key) ). These nonces will be used to generate the Client key, the Server key and the stored key by both the parties.
+
+### Second possibility - User generation by the Server
+
+1. A Client sends its username, a random nonce and his public key to the Server
+2. The Server takes track of the Client's session, storing the received credentials. Then, it randomly generates a uuid4 password for that Client, it generates a random nonce, a random salt, an iteration count (4096) and it creates the salted password with PBKDF2+HMAC algorithm. Lastly, the Server generates a public key and 2 random nonces ("Client key" and "Server key"). These nonces will be used to generate the Client key, the Server key and the stored key by both the parties.
+3. #### TODO
+
+
 
 ## Authentication
 1. Both parties generate an authenticated message
@@ -30,7 +44,7 @@ https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange
 
 ## Diffie Hellman
 
-We have decided to implement Diffie Hellman key exchange algorithm in SCRAM with the aim to avoiding the user to use other libraries for the shared secret. Our DH library makes use of the safe prime
+We have decided to implement Diffie Hellman key exchange algorithm in SCRAM-SHA256 with the aim to avoiding the user to use other libraries for the shared secret. Our DH library makes use of the safe prime
 
 ```
 FFFFFFFF FFFFFFFF C90FDAA2 2168C234 C4C6628B 80DC1CD1
@@ -88,10 +102,9 @@ For further information about these conditions, see
 
 https://crypto.stackexchange.com/questions/2131/how-should-i-check-the-received-ephemeral-diffie-hellman-public-keys
 
-![ ](https://i.imgflip.com/1vnort.jpg)
+![ ](https://media.giphy.com/media/BmmfETghGOPrW/giphy.gif)
 
 
-## Scram
+## Scram-SHA256
 
 We have added session feature so that the Server can store Clients nonces with their relative timestamps with the aim to prevent possible attacks, such as replay attack. We have simplified some notation used in SCRAM RFC, while maintaining the original mechanism and purpose.
-
