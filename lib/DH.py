@@ -24,6 +24,7 @@ class DH(object):
         define random exponent
         """
         self.__a = int(binascii.hexlify(os.urandom(self.KEY_SIZE)), base=16)
+        
 
     def public_key(self):
         """
