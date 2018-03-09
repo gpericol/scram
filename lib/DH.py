@@ -2,6 +2,12 @@ import os
 import binascii
 import hashlib
 
+class DHBadKeyException(Exception):
+    """Wrong received key
+    key should not be 1 or p-1 and the group order should be at least (P-1) / 2
+    """
+    pass
+
 class DH(object):
     """ A Diffie Hellman implementation
     Constants:
@@ -41,4 +47,4 @@ class DH(object):
         if 2 <= other_key and other_key <= self.P - 2 and pow(other_key, (self.P - 1) / 2, self.P) == 1:
             return hashlib.sha256(str(pow(other_key, self.__a, self.P)).encode()).digest()
 
-        raise Exception("bad other_key")
+        raise DHBadKeyException

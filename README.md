@@ -1,6 +1,6 @@
 # Salted Challenge Response Authentication Message - SHA 256 feat. Diffie Hellman
 
-#### Gianluca Pericoli, Luca Zanolini
+#### Luca Zanolinim, Gianluca Pericoli 
 
 A modified version of SCRAM-SHA256 Authentication 
 

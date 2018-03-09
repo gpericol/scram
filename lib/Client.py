@@ -1,93 +1,117 @@
 from Scram import Scram 
-from DH import DH
+from DH import *
 from Utils import Utils
 import binascii
 
 class Client(object):
-    __client_key = None
-    __server_key = None
-    __stored_key = None
-    __username = None
-    __password = None
-    __shared_key = None
-    __salted_password = None
-    __client_nonce = None
-    __server_nonce = None
-    __salt = None
-    __ic = None
-    __auth_message = None
-
     __dh = None
 
-    def __init__(self, username, password):
-        self.__username = username
-        self.__password = password
+    def __init__(self):
         self.__dh = DH()
 
-    def registration_pairing(self):
-        self.__client_nonce = Utils.nonce(32)
+    def _check_nonce(self, nonce):
+        if nonce.count('-')  != 1:
+            raise Exception("Wrong nonce")
+        try:
+            client_nonce, server_nonce = nonce.split("-")
+        except:
+            raise Exception("Wrong nonce")
+        return client_nonce, server_nonce
+
+    def registration_pairing(self, username, password):
+        self.__data = {
+            "username": username,
+            "password": password,
+            "nonce": Utils.nonce(32)
+        }
+
         return {
-            "username": self.__username,
+            "username": self.__data['username'],
             "public_key": format(self.__dh.public_key(), 'x'),
-            "client_nonce": self.__client_nonce
+            "client_nonce": self.__data['nonce']
         }
     
-    def registration_send_password(self, msg):
-        # fare try catch
-        self.__shared_key = self.__dh.shared_secret(msg['public_key'])
+    def registration_send_password(self, salt, ic, public_key, nonce):
+        try:
+            self.__data['shared_key'] = self.__dh.shared_secret(public_key)
+            client_nonce, server_nonce = self._check_nonce(nonce)
+        except DHBadKeyException:
+            raise Exception("Bad DH pairing")
+        except Exception as e:
+            raise Exception(str(e))
+
+        if client_nonce != self.__data['nonce']:
+            raise Exception("Bad nonce")     
         
-        # fare raise Error
-        if self.__client_nonce != msg['client_nonce']:
-            print "ERROR"
+        self.__data['nonce'] = client_nonce + "-" + server_nonce
 
-        self.__server_nonce = msg['server_nonce']
-
-        self.__salt = msg['salt']
-        self.__ic = msg['ic']
-
-        salted_password = Scram.salted_password(self.__password, self.__salt, self.__ic)
-
-        secret_salted_password = Utils.bitwise_xor(salted_password, self.__shared_key)
+        self.__data['salted_password'] = Scram.salted_password(self.__data['password'], salt, ic)
+        secret_salted_password = Utils.bitwise_xor(self.__data['salted_password'], self.__data['shared_key'])
 
         return {
-            "username": self.__username,
             "secret_key": Utils.hex(secret_salted_password),
-            "client_nonce": self.__client_nonce,
-            "server_nonce": self.__server_nonce
+            "nonce": self.__data['nonce'],
         }
     
-    def registration_keys_generation(self, msg):
+    def registration_keys_generation(self, secret_server_key, secret_client_key, nonce):
+        if self.__data['nonce'] != nonce:
+            raise Exception("Bad nonce") 
 
-        if self.__client_nonce != msg['client_nonce']:
-            print "ERROR"
+        client_key = Utils.bitwise_xor(Utils.unhex(secret_client_key), self.__data['shared_key'])
+        server_key = Utils.bitwise_xor(Utils.unhex(secret_server_key), self.__data['shared_key'])
 
-        client_key = Utils.bitwise_xor(Utils.unhex(msg['client_key']), self.__shared_key)
-        server_key = Utils.bitwise_xor(Utils.unhex(msg['server_key']), self.__shared_key)
+        client_client_key = Utils.hmac_generation(self.__data['salted_password'], client_key)
+        client_server_key = Utils.hmac_generation(self.__data['salted_password'], server_key)
+        client_stored_key = Scram.stored_key_generation(client_client_key)
 
-        client_client_key = Utils.hmac_generation(salted_password, client_key)
-        client_server_key = Utils.hmac_generation(salted_password, server_key)
-        client_stored_key = Utils.stored_key_generation(client_client_key)
-
-        return {
+        return_value = {
             "server_key": Utils.hex(client_server_key),
             "client_key": Utils.hex(client_client_key),
-            "stored_key": Utils.hex(client_stored_key)
+            "stored_key": client_stored_key
         }
 
-    def authentication_client_proof_generation(self, msg): # msg is the returned value of registration_keys_generation
+        self.__data = {}
 
-        self.__auth_message = Scram.auth_message_generation(self.username, self.__client_nonce, self.__salt, self.__ic, self.__server_nonce)
-        client_signature = Scram.signature_generation(msg['stored_key'], self.__auth_message)
-        client_proof = Scram.client_proof_generation(msg['client_key'], client_signature)
+        self.__data={
+            "server_key": Utils.hex(client_server_key),
+            "client_key": Utils.hex(client_client_key),
+            "stored_key": client_stored_key
+        }
+    
+        return return_value
+
+    def authentication_pairing(self, username, client_key, server_key):
+        self.__data['nonce'] = Utils.nonce(32)
+        self.__data['username'] = username
+        self.__data['client_key'] = client_key
+        self.__data['server_key'] = server_key
+        self.__data['stored_key'] = Scram.stored_key_generation(Utils.unhex(self.__data['client_key']))
 
         return {
-                "username": self.username 
-                "auth_message": auth_message
-                "client_proof": client_proof
-            }
+            "username": username,
+            "client_nonce": self.__data['nonce']
+        }
 
-    def server_authentication(self, msg, msg_from_server): # msg is the returned value of registration_keys_generation
+    def authentication_client_proof_generation(self, nonce, salt, ic):
+        try:
+            client_nonce, server_nonce = self._check_nonce(nonce)
+        except Exception as e:
+            raise Exception(str(e))
 
-        if msg['message']:
-            server_signature = Utils.hex(Scram.signature_generation(msg['server_key'],self.__auth_message))
-            client_verification_message = client_scram.client_final_verification(server_signature, msg_from_server['server_signature'])
+        if client_nonce != self.__data['nonce']:
+            raise Exception("Bad nonce")
+            
+        self.__data['auth_message'] = Scram.auth_message_generation(self.__data['username'], client_nonce, salt, ic, server_nonce)
+        client_signature = Scram.signature_generation(self.__data['stored_key'], self.__data['auth_message'])
+        self.__data['client_proof'] = Scram.client_proof_generation(Utils.unhex(self.__data['client_key']), client_signature)
+
+        return {
+            "nonce": nonce,
+            "client_proof": self.__data['client_proof']
+        }
+
+    def server_authentication(self, server_signature):
+        client_server_signature = Utils.hex(Scram.signature_generation(self.__data['server_key'], self.__data['auth_message']))
+
+        if client_server_signature != server_signature:
+            raise Exception("Verification failed")

@@ -1,70 +1,72 @@
 from Scram import Scram 
-from DH import DH
 from Utils import Utils
+from DH import *
+from Session import *
 import binascii
 
 # Pensare se ha senso implementare l'id di sessione con i 2 nonce
 class Server(object):
     TTL = 10
     IC = 4096
-    __sessions = None
-    __data = None
-    __dh = None
-    __scram = None
 
     def __init__(self):
-        self.__sessions = {}
+        self.__sessions = Session() 
         self.__data = {}
         self.__dh = DH()
 
-    def _get_session(self, username):
-        return self.__sessions.get(username)
+    def _get_session(self, nonce):
+        if nonce.count('-')  != 1:
+            raise Exception("Wrong nonce")
+        try:
+            client_nonce, server_nonce = nonce.split("-")
+            session = self.__sessions.get_session(client_nonce)
+        except SessionNotExistsException:
+            raise Exception("Session does not exists")
+        except:
+            raise Exception("Wrong nonce")
 
-    def _set_session(self, username):
-        self.__sessions['username'] = {
-            "client_nonce": None,
-            "server_nonce": None,
-            "shared_key": None,
-            "salt": None
-        }
-        return self.__sessions['username']
+        if session['server_nonce'] != server_nonce:
+            raise Exception("Wrong server nonce")
 
-    def _save_record(self, username, record):
-        self.__data['username'] = record
+        return client_nonce, server_nonce, session
 
     # First possibility - Client-Server registration
 
-    def registration_pairing(self, msg):
-        if self._get_session(username):
-            # session already exists
-            raise Exception("session error")
+    def registration_pairing(self, username, client_nonce, public_key):
+        server_nonce =  Utils.nonce(32)
+        nonce = client_nonce + "-" + server_nonce
+        
+        try:
+            self.__sessions.start_session(client_nonce)
+            shared_key = self.__dh.shared_secret(public_key)
+        except SessionExistsException:
+            raise Exception("Session already exists")
+        except DHBadKeyException:
+            raise Exception("Wrong public key")
 
-        session = self._set_session(username)
-        session['client_nonce'] = msg['client_nonce']
+        salt = Utils.nonce(32)
 
-        # usare try catch con eccezioni
-        session['shared_key'] = self.__dh.shared_secret(msg['public_key'])
-        session['server_nonce'] = Utils.nonce(32)
-        session['salt'] = Utils.nonce(32)
-
-        self._save_record(msg['username'], {
-            "client_nonce": session['client_nonce'],
-            "server_nonce": session['server_nonce']
+        self.__sessions.set_session(client_nonce,{
+            'username': username,
+            'server_nonce': server_nonce,
+            'shared_key': shared_key,
+            'salt': salt
         })
 
         return {
-            "salt": session['salt'],
+            "salt": salt,
             "ic": self.IC,
             "public_key": format(self.__dh.public_key(), 'x'),
-            "client_nonce": session['client_nonce'],
-            "server_nonce": session['server_nonce']
+            "nonce": nonce
         }
 
-    def registration_get_password(self, msg):
-        session = self._get_session(msg['username'])
+    def registration_keys_generation(self, nonce, secret_key):
+        try:
+            client_nonce,server_nonce,session = self._get_session(nonce)
+        except Exception as e:
+            raise Exception(str(e))
         
-        crypted_password = Utils.unhex(msg['secret_key'])
-        salted_password = Utils.bitwise_xor(crypted_password, session['shared_key'])
+        salted_password = Utils.bitwise_xor(Utils.unhex(secret_key), session['shared_key'])
         
         client_key = Utils.nonce(32)
         server_key = Utils.nonce(32)
@@ -74,40 +76,23 @@ class Server(object):
         
         stored_key = Scram.stored_key_generation(server_client_key)
 
-        self._save_record(msg['username'], {
+        # creare db username
+        self.__data[session['username']] = {
             "stored_key": stored_key,
             "server_key": Utils.hex(server_server_key),
             "salt": session['salt'],
             "ic": self.IC
-        })
-
+        }
+        
         return_value = {
-            "server_key": Utils.hex(Utils.bitwise_xor(Utils.unhex(server_key), session['shared_key'])),
-            "client_key": Utils.hex(Utils.bitwise_xor(Utils.unhex(client_key), session['shared_key'])),
-            "client_nonce": session['client_nonce'],
-            "server_nonce": session['server_nonce']
+            "secret_server_key": Utils.hex(Utils.bitwise_xor(Utils.unhex(server_key), session['shared_key'])),
+            "secret_client_key": Utils.hex(Utils.bitwise_xor(Utils.unhex(client_key), session['shared_key'])),
+            "nonce": nonce
         }
 
-        del session
-        del session[msg['username']]
+        self.__sessions.delete_session(client_nonce)
         
         return return_value
-
-
-    def client_authentication(self, msg):
-
-        auth_message = Scram.auth_message_generation(msg['username'], self.__data['username']['client_nonce'], self.__data['username']['salt'], self.__data['username']['ic'], self.__data['username']['server_nonce'])
-        client_signature = Scram.signature_generation(self.__data['username']['stored_key'], auth_message)
-        server_signature = Scram.signature_generation(self.__data['username']['server_key'], auth_message)
-
-        verification_message = Scram.server_final_verification(Scram.stored_key_generation(Utils.bitwise_xor(Utils.unhex(msg['client_proof']), client_signature)), self.__data['username']['stored_key'])
-
-        return {
-            "message": verification_message,
-            "server_signature": Utils.hex(server_signature)
-        }
-
-    # Second possibility - User generation by the Server
 
     def generate_user(self, username):
         password = Utils.generate_password()
@@ -128,8 +113,6 @@ class Server(object):
 
         self._save_record(username, record)
 
-        print self.__data
-
         return {
             "username": username,
             "password": password,
@@ -137,4 +120,49 @@ class Server(object):
             "ic": self.IC,
             "client_key": client_key,
             "server_key": server_key            
+        }
+
+    def authentication_pairing(self, username, client_nonce):
+        try:
+            self.__sessions.start_session(client_nonce)
+        except SessionExistsException:
+            raise Exception("Session already exists")
+        
+        if self.__data.has_key('username'):
+            raise Exception("Wrong username")
+
+        server_nonce =  Utils.nonce(32)
+        nonce = client_nonce + "-" + server_nonce
+        salt = Utils.nonce(32)
+
+        self.__sessions.set_session(client_nonce, {
+            'username': username,
+            'server_nonce': server_nonce,
+            'salt': salt
+        })
+
+        return {
+            "salt": salt,
+            "ic": self.IC,
+            "nonce": nonce
+        }
+
+    def authentication_proof(self, client_proof, nonce):    
+        try:
+            client_nonce, server_nonce, session = self._get_session(nonce)
+        except Exception as e:
+            raise Exception(str(e))
+        
+        record = self.__data[session['username']]
+
+        auth_message = Scram.auth_message_generation(session['username'], client_nonce, session['salt'], self.IC, server_nonce)
+
+        client_signature = Scram.signature_generation(record['stored_key'], auth_message)
+        server_signature = Scram.signature_generation(record['server_key'], auth_message)
+
+        if Scram.stored_key_generation(Utils.bitwise_xor(Utils.unhex(client_proof), client_signature)) != record['stored_key']:
+            raise Exception("Verification failed")
+
+        return {
+            "server_signature": Utils.hex(server_signature)
         }

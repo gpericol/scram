@@ -14,7 +14,7 @@ class Scram(object):
 
     @staticmethod
     def auth_message_generation(username, client_nonce, salt, ic, server_nonce):
-        return Utils.hex(username+client_nonce+salt+ic+server_nonce)
+        return username+client_nonce+salt+str(ic)+server_nonce
 
     @staticmethod
     def signature_generation(auth_message, stored_key):
@@ -23,20 +23,7 @@ class Scram(object):
     @staticmethod
     def client_proof_generation(client_key, client_signature):
         return Utils.hex(Utils.bitwise_xor(client_key, client_signature))
-    
-    @staticmethod
-    def server_final_verification(client_stored_key, server_stored_key):
-        if client_stored_key == server_stored_key:
-            return True
-        else:
-            return False
-    
-    @staticmethod
-    def client_final_verification(client_server_signature, server_server_signature):
-        if client_server_signature == server_server_signature:
-            return True
-        else:
-            return False
+
         
             
 
