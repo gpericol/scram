@@ -16,6 +16,8 @@ https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange
 
 ## Registration
 
+We have decided to implement this part of the scheme in a way that the User can choose between 2 possibilities.
+
 ### First possibility - Client-Server registration
 
 1. A Client sends its username, a random nonce and his public key to the Server
@@ -25,13 +27,15 @@ https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange
 
 ### Second possibility - User generation by the Server
 
-1. A Client sends its username, a random nonce and his public key to the Server
-2. The Server takes track of the Client's session, storing the received credentials. Then, it randomly generates a uuid4 password for that Client, it generates a random nonce, a random salt, an iteration count (4096) and it creates the salted password with PBKDF2+HMAC algorithm. Lastly, the Server generates a public key and 2 random nonces ("Client key" and "Server key"). These nonces will be used to generate the Client key, the Server key and the stored key by both the parties.
-3. #### TODO
-
+1. A Client sends its username and a random nonce to the Server
+2. The Server takes track of the Client's session, storing the received credentials. Then, it randomly generates a uuid4 password for that Client, it generates a random nonce, a random salt, an iteration count (4096) and it creates the salted password with PBKDF2+HMAC algorithm. Lastly, the Server generates 2 random nonces ("Client key" and "Server key"). These nonces will be used to generate the Client key, the Server key and the stored key by both the parties.
+3. The Client starts an ssh session with the Server and it securely takes the salted password, "Client key", "Server key", the salt, the ic and the Server nonce. 
 
 
 ## Authentication
+
+This part is common for both.
+
 1. Both parties generate an authenticated message
 2. The Client generates the Client proof and sends it with the authenticated message to the Server
 3. The Server verifies the proof and sends his signature to the Client
@@ -107,4 +111,4 @@ https://crypto.stackexchange.com/questions/2131/how-should-i-check-the-received-
 
 ## Scram-SHA256
 
-We have added session feature so that the Server can store Clients nonces with their relative timestamps with the aim to prevent possible attacks, such as replay attack. We have simplified some notation used in SCRAM RFC, while maintaining the original mechanism and purpose.
+We have added session feature so that the Server can store Clients nonces with the aim to prevent possible attacks, such as replay attack. We have simplified some notation used in SCRAM RFC, while maintaining the original mechanism and purpose. In particular, we have decided to use the SCRAM variant with SHA256, instead of the original SHA1.
