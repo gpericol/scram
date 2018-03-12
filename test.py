@@ -1,6 +1,6 @@
-from lib import Client
-from lib import Server
-from lib import AbstractRecord
+from scram_dh import Client
+from scram_dh import Server
+from scram_dh import AbstractRecord
 
 # AbstractRecord Implementation
 class Record(AbstractRecord):
