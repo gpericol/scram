@@ -45,9 +45,9 @@ This part is common for both.
 
 # Implementation choices
 
-## Diffie Hellman
+## Ephimeral Diffie Hellman
 
-We have decided to implement Diffie Hellman key exchange algorithm in SCRAM-SHA256 with the aim to avoiding the user to use other libraries for the shared secret. Our DH library makes use of the safe prime
+We have decided to implement Ephemeral Diffie Hellman key exchange algorithm in SCRAM-SHA256 with the aim to avoiding the user to use other libraries for the shared secret. Our DH library makes use of the safe prime
 
 ```
 
@@ -82,7 +82,7 @@ We have decided to implement Diffie Hellman key exchange algorithm in SCRAM-SHA2
 
 ```
 
- as group order (6144 bit), with 2 as generator of the group, following the indication of 
+as group order (6144 bit), with 2 as generator of the group, following the indication of 
 
 https://www.ietf.org/rfc/rfc3526.txt.
 
@@ -118,7 +118,7 @@ https://crypto.stackexchange.com/questions/2131/how-should-i-check-the-received-
 
 ## Scram-SHA256
 
-We have added session feature so that the Server can store Clients nonces with the aim to prevent possible attacks, such as replay attack. We have simplified some notation used in SCRAM RFC, while maintaining the original mechanism and purpose. In particular, we have decided to use the SCRAM variant with SHA256, instead of the original SHA1.
+We have added session feature so that the Server can store Clients data with the aim to prevent possible attacks, such as replay attack. Furthermore, we have added a TTL (time to live) parameter so that sessions will be removed after 10 seconds. We have added an abstract class for the storage so that one can choose the type of structure to use for saving Server records. Lastly, we have simplified some notation used in SCRAM RFC, while maintaining the original mechanism and purpose. In particular, we have decided to use the SCRAM variant with SHA256, instead of the original SHA1.
 
 ## LICENCE
 
