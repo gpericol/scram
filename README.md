@@ -12,7 +12,7 @@ https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange
 
 #### Designed and built with all the Love❤️ in the World🌍 by Luca Zanolini & Gianluca Pericoli
 
-# Steps
+# How does it work
 
 ## Registration
 
@@ -24,6 +24,23 @@ We have decided to implement this part of the scheme in a way that the User can 
 2. The Server takes track of the Client's session, storing the received credentials. Then, it sends a random nonce, a random salt, an iteration count (4096) and its public key to the Client. Now both the parties have the shared secret key. 
 3. The Client generates the salted password with PBKDF2+HMAC algorithm sending it to the Server in an encrypted way ( XOR (salted_password, shared secret key) )
 4. The Server decrypts the salted password, generates 2 random nonces ("Client key" and "Server key") which will be sended in an encrypted way to the Client ( XOR ("Client key"/"Server key", shared secret key) ). These nonces will be used to generate the Client key, the Server key and the stored key by both the parties.
+
+```
+CLIENT                                                                            SERVER
+   |                                                                                |
+#1 |        registration_pairing - (username, public_key, client_nonce)             |
+   | -----------------------------------------------------------------------------> |
+   |                                                                                |
+#2 |            registration_pairing - (salt, ic, public_key, nonce)                |
+   | <----------------------------------------------------------------------------- |
+   |                                                                                |
+#3 |               registration_send_password - (secret_key, nonce)                 |
+   | -----------------------------------------------------------------------------> |
+   |                                                                                |
+#4 | registration_keys_generation - (secret_server_key, secret_client_key, nonce)   |
+   | <----------------------------------------------------------------------------- |
+```
+
 
 ### Second possibility - User generation by the Server
 
@@ -41,7 +58,30 @@ This part is common for both.
 4. The Client verifies the Server signature
 5. If all the checks are successful, ok, otherwise
 
-![ ](https://memegenerator.net/img/instances/68189102/authentication-failed-you-shall-not-pass.jpg)
+![you shall not pass](https://memegenerator.net/img/instances/68189102/authentication-failed-you-shall-not-pass.jpg)
+
+```
+CLIENT                                                                            SERVER
+   |                                                                                |
+#1 |                    auth_pairing - (username, client_nonce)                     |
+   | -----------------------------------------------------------------------------> |
+   |                                                                                |
+#2 |                         auth_pairing - (salt, ic, nonce)                       |
+   | <----------------------------------------------------------------------------- |
+   |                                                                                |
+#3 |               auth_client_proof_generation - (client_proof, nonce)             |
+   | -----------------------------------------------------------------------------> |
+   |                                                                                |
+#4 |                         auth_proof - (server_signature)                        |
+   | <----------------------------------------------------------------------------- |
+```
+
+
+# How to use
+Please look at `test.py` on this repo
+
+On the Server you must implement the abstract class `lib/AbstractRecord` choosing the storing structure for the keys
+
 
 # Implementation choices
 
@@ -84,7 +124,7 @@ We have decided to implement Ephemeral Diffie Hellman key exchange algorithm in 
 
 as group order (6144 bit), with 2 as generator of the group, following the indication of 
 
-https://www.ietf.org/rfc/rfc3526.txt.
+https://www.ietf.org/rfc/rfc3526.txt
 
 To use different safe primes, just modify the library. 
 
@@ -113,12 +153,20 @@ For further information about these conditions, see
 
 https://crypto.stackexchange.com/questions/2131/how-should-i-check-the-received-ephemeral-diffie-hellman-public-keys
 
-![ ](https://media.giphy.com/media/BmmfETghGOPrW/giphy.gif)
+![deep think](https://media.giphy.com/media/BmmfETghGOPrW/giphy.gif)
 
 
 ## Scram-SHA256
 
 We have added session feature so that the Server can store Clients data with the aim to prevent possible attacks, such as replay attack. Furthermore, we have added a TTL (time to live) parameter so that sessions will be removed after 10 seconds. We have added an abstract class for the storage so that one can choose the type of structure to use for saving Server records. Lastly, we have simplified some notation used in SCRAM RFC, while maintaining the original mechanism and purpose. In particular, we have decided to use the SCRAM variant with SHA256, instead of the original SHA1.
+
+
+## References
+[Solar Designer inspiration tweet](https://twitter.com/solardiz/status/965599513497960449)
+
+[Kai Dietrich explanation blog post](https://www.cleeus.de/w/blog/2018/02/13/The_SCRAM_Authentication_Protocol.html)
+
+[MongoDB blog post](https://www.mongodb.com/blog/post/improved-password-based-authentication-mongodb-30-scram-explained-part-1?jmp=docs)
 
 ## LICENCE
 
