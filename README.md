@@ -45,7 +45,7 @@ This part is common for both.
 
 # Implementation choices
 
-## Ephimeral Diffie Hellman
+## Ephemeral Diffie Hellman
 
 We have decided to implement Ephemeral Diffie Hellman key exchange algorithm in SCRAM-SHA256 with the aim to avoiding the user to use other libraries for the shared secret. Our DH library makes use of the safe prime
 
