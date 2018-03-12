@@ -3,6 +3,10 @@ from DH import *
 from Utils import Utils
 import binascii
 
+class ClientNonceException(Exception):
+    """Client Nonce Exception class"""
+    pass
+
 class Client(object):
     """Client class:
     It permits to register and authenticate to a Server
@@ -21,11 +25,11 @@ class Client(object):
     def _check_nonce(self, nonce):
         """It verifies the correctness of a given nonce"""
         if nonce.count('-')  != 1:
-            raise Exception("Wrong nonce")
+            raise ClientNonceException
         try:
             client_nonce, server_nonce = nonce.split("-")
-        except:
-            raise Exception("Wrong nonce")
+        except ClientNonceException:
+            raise ClientNonceException
         return client_nonce, server_nonce
 
     def registration_pairing(self, username, password):
@@ -48,12 +52,12 @@ class Client(object):
             self.__data['shared_key'] = self.__dh.shared_secret(public_key)
             client_nonce, server_nonce = self._check_nonce(nonce)
         except DHBadKeyException:
-            raise Exception("Bad DH pairing")
-        except Exception as e:
-            raise Exception(str(e))
+            raise DHBadKeyException
+        except ClientNonceException:
+            raise ClientNonceException
 
         if client_nonce != self.__data['nonce']:
-            raise Exception("Bad nonce")     
+            raise ClientNonceException   
         
         self.__data['nonce'] = client_nonce + "-" + server_nonce
 
@@ -68,7 +72,7 @@ class Client(object):
     def registration_keys_generation(self, secret_server_key, secret_client_key, nonce):
         """Returns Client key, server key and stored key, given encrypted "Server key" and encrypted "Slient key" and combined nonce"""
         if self.__data['nonce'] != nonce:
-            raise Exception("Bad nonce") 
+            raise ClientNonceException
 
         client_key = Utils.bitwise_xor(secret_client_key, self.__data['shared_key'])
         server_key = Utils.bitwise_xor(secret_server_key, self.__data['shared_key'])
@@ -110,11 +114,11 @@ class Client(object):
         """Returns combined nonce and Client proof, given combined nonce, salt and ic by the Server"""
         try:
             client_nonce, server_nonce = self._check_nonce(nonce)
-        except Exception as e:
-            raise Exception(str(e))
+        except ClientNonceException:
+            raise ClientNonceException
 
         if client_nonce != self.__data['nonce']:
-            raise Exception("Bad nonce")
+            raise ClientNonceException
             
         self.__data['auth_message'] = Scram.auth_message_generation(self.__data['username'], client_nonce, salt, ic, server_nonce)
         client_signature = Scram.signature_generation(self.__data['stored_key'], self.__data['auth_message'])

@@ -31,7 +31,6 @@ We have decided to implement this part of the scheme in a way that the User can 
 2. The Server takes track of the Client's session, storing the received credentials. Then, it randomly generates a uuid4 password for that Client, it generates a random nonce, a random salt, an iteration count (4096) and it creates the salted password with PBKDF2+HMAC algorithm. Lastly, the Server generates 2 random nonces ("Client key" and "Server key"). These nonces will be used to generate the Client key, the Server key and the stored key by both the parties.
 3. The Client starts an ssh session with the Server and it securely takes the salted password, "Client key", "Server key", the salt, the ic and the Server nonce. 
 
-
 ## Authentication
 
 This part is common for both.

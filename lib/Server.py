@@ -4,6 +4,10 @@ from DH import *
 from Session import *
 import binascii
 
+class ServerNonceException(Exception):
+    """Server Nonce Exception class"""
+    pass
+
 class Server(object):
     """ Server class:
     It permits to accept a registration from a Client and authenticate it
@@ -18,29 +22,29 @@ class Server(object):
     KEY_SIZE = 32
     IC = 4096
 
-    def __init__(self):
-        self.__sessions = Session() 
-        self.__data = {}
+    def __init__(self, record):
+        self.__sessions = Session()
+        self.__record = record
 
     def _get_session(self, nonce):
         """Returns Client nonce, Server nonce and the current session"""
         if nonce.count('-')  != 1:
-            raise Exception("Wrong nonce")
+            raise ServerNonceException
         try:
             client_nonce, server_nonce = nonce.split("-")
             session = self.__sessions.get_session(client_nonce)
+        except ServerNonceException:
+            raise ServerNonceException
         except SessionNotExistsException:
-            raise Exception("Session does not exists")
-        except:
-            raise Exception("Wrong nonce")
+            raise SessionNotExistsException
 
         if session['server_nonce'] != server_nonce:
-            raise Exception("Wrong Server nonce")
+            raise ServerNonceException
 
         return client_nonce, server_nonce, session
 
     def registration_pairing(self, username, client_nonce, public_key):
-        """Returns a random salt, ic, Server public key and combined nonce, given Client username, Client nonce and Client public key """
+        """Returns a random salt, ic, Server public key and combined nonce, given Client username, Client nonce and Client public key"""
         dh = DH()        
         server_nonce =  Utils.nonce(self.NONCE_SIZE)
         nonce = client_nonce + "-" + server_nonce
@@ -49,9 +53,9 @@ class Server(object):
             self.__sessions.start_session(client_nonce)
             shared_key = dh.shared_secret(public_key)
         except SessionExistsException:
-            raise Exception("Session already exists")
+            raise SessionExistsException
         except DHBadKeyException:
-            raise Exception("Wrong public key")
+            raise DHBadKeyException
 
         salt = Utils.nonce(self.SALT_SIZE)
 
@@ -73,8 +77,8 @@ class Server(object):
         """Returns encrypted "Client key", encrypted "Server key" and combined nonce and delete the session"""
         try:
             client_nonce,server_nonce,session = self._get_session(nonce)
-        except Exception as e:
-            raise Exception(str(e))
+        except ServerNonceException:
+            raise ServerNonceException
         
         salted_password = Utils.bitwise_xor(secret_key, session['shared_key'])
         
@@ -87,12 +91,13 @@ class Server(object):
         stored_key = Scram.stored_key_generation(server_client_key)
 
         # creare db username
-        self.__data[session['username']] = {
+        
+        self.__record.write(session['username'], {
             "stored_key": stored_key,
             "server_key": server_server_key,
             "salt": session['salt'],
             "ic": self.IC
-        }
+        })
         
         return_value = {
             "secret_server_key": Utils.bitwise_xor(server_key, session['shared_key']),
@@ -138,9 +143,11 @@ class Server(object):
         try:
             self.__sessions.start_session(client_nonce)
         except SessionExistsException:
-            raise Exception("Session already exists")
+            raise SessionExistsException
         
-        if self.__data.has_key('username'):
+        record = self.__record.read(username)
+        
+        if not record:
             raise Exception("Wrong username")
 
         server_nonce =  Utils.nonce(self.NONCE_SIZE)
@@ -163,10 +170,10 @@ class Server(object):
         """Returns Server signature given Client proof and combined nonce""" 
         try:
             client_nonce, server_nonce, session = self._get_session(nonce)
-        except Exception as e:
-            raise Exception(str(e))
+        except ServerNonceException:
+            raise ServerNonceException
         
-        record = self.__data[session['username']]
+        record = self.__record.read(session['username'])
 
         auth_message = Scram.auth_message_generation(session['username'], client_nonce, session['salt'], self.IC, server_nonce)
 

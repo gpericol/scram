@@ -28,7 +28,3 @@ class Scram(object):
     def client_proof_generation(client_key, client_signature):
         """Returns Client proof, given Client key and Client signature"""
         return Utils.bitwise_xor(client_key, client_signature)
-
-        
-            
-
