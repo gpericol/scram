@@ -10,7 +10,7 @@ class Scram(object):
 
     @staticmethod
     def stored_key_generation(client_key):
-        return Utils.hexed_sha256(client_key)
+        return Utils.sha256(client_key)
 
     @staticmethod
     def auth_message_generation(username, client_nonce, salt, ic, server_nonce):
@@ -22,7 +22,7 @@ class Scram(object):
 
     @staticmethod
     def client_proof_generation(client_key, client_signature):
-        return Utils.hex(Utils.bitwise_xor(client_key, client_signature))
+        return Utils.bitwise_xor(client_key, client_signature)
 
         
             

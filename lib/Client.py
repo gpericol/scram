@@ -49,7 +49,7 @@ class Client(object):
         secret_salted_password = Utils.bitwise_xor(self.__data['salted_password'], self.__data['shared_key'])
 
         return {
-            "secret_key": Utils.hex(secret_salted_password),
+            "secret_key": secret_salted_password,
             "nonce": self.__data['nonce'],
         }
     
@@ -57,42 +57,42 @@ class Client(object):
         if self.__data['nonce'] != nonce:
             raise Exception("Bad nonce") 
 
-        client_key = Utils.bitwise_xor(Utils.unhex(secret_client_key), self.__data['shared_key'])
-        server_key = Utils.bitwise_xor(Utils.unhex(secret_server_key), self.__data['shared_key'])
+        client_key = Utils.bitwise_xor(secret_client_key, self.__data['shared_key'])
+        server_key = Utils.bitwise_xor(secret_server_key, self.__data['shared_key'])
 
         client_client_key = Utils.hmac_generation(self.__data['salted_password'], client_key)
         client_server_key = Utils.hmac_generation(self.__data['salted_password'], server_key)
         client_stored_key = Scram.stored_key_generation(client_client_key)
 
         return_value = {
-            "server_key": Utils.hex(client_server_key),
-            "client_key": Utils.hex(client_client_key),
+            "server_key": client_server_key,
+            "client_key": client_client_key,
             "stored_key": client_stored_key
         }
 
         self.__data = {}
 
         self.__data={
-            "server_key": Utils.hex(client_server_key),
-            "client_key": Utils.hex(client_client_key),
+            "server_key": client_server_key,
+            "client_key": client_client_key,
             "stored_key": client_stored_key
         }
     
         return return_value
 
-    def authentication_pairing(self, username, client_key, server_key):
+    def auth_pairing(self, username, client_key, server_key):
         self.__data['nonce'] = Utils.nonce(32)
         self.__data['username'] = username
         self.__data['client_key'] = client_key
         self.__data['server_key'] = server_key
-        self.__data['stored_key'] = Scram.stored_key_generation(Utils.unhex(self.__data['client_key']))
+        self.__data['stored_key'] = Scram.stored_key_generation(self.__data['client_key'])
 
         return {
             "username": username,
             "client_nonce": self.__data['nonce']
         }
 
-    def authentication_client_proof_generation(self, nonce, salt, ic):
+    def auth_client_proof_generation(self, nonce, salt, ic):
         try:
             client_nonce, server_nonce = self._check_nonce(nonce)
         except Exception as e:
@@ -103,15 +103,15 @@ class Client(object):
             
         self.__data['auth_message'] = Scram.auth_message_generation(self.__data['username'], client_nonce, salt, ic, server_nonce)
         client_signature = Scram.signature_generation(self.__data['stored_key'], self.__data['auth_message'])
-        self.__data['client_proof'] = Scram.client_proof_generation(Utils.unhex(self.__data['client_key']), client_signature)
+        self.__data['client_proof'] = Scram.client_proof_generation(self.__data['client_key'], client_signature)
 
         return {
             "nonce": nonce,
             "client_proof": self.__data['client_proof']
         }
 
-    def server_authentication(self, server_signature):
-        client_server_signature = Utils.hex(Scram.signature_generation(self.__data['server_key'], self.__data['auth_message']))
+    def server_auth(self, server_signature):
+        client_server_signature = Scram.signature_generation(self.__data['server_key'], self.__data['auth_message'])
 
         if client_server_signature != server_signature:
             raise Exception("Verification failed")

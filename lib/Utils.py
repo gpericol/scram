@@ -15,8 +15,8 @@ class Utils(object):
         return binascii.unhexlify(data)
     
     @staticmethod
-    def hexed_sha256(data):
-        return hashlib.sha256(data).hexdigest()
+    def sha256(data):
+        return hashlib.sha256(data).digest()
 
     @staticmethod
     def nonce(size):

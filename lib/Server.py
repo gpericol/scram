@@ -66,7 +66,7 @@ class Server(object):
         except Exception as e:
             raise Exception(str(e))
         
-        salted_password = Utils.bitwise_xor(Utils.unhex(secret_key), session['shared_key'])
+        salted_password = Utils.bitwise_xor(secret_key, session['shared_key'])
         
         client_key = Utils.nonce(32)
         server_key = Utils.nonce(32)
@@ -79,14 +79,14 @@ class Server(object):
         # creare db username
         self.__data[session['username']] = {
             "stored_key": stored_key,
-            "server_key": Utils.hex(server_server_key),
+            "server_key": server_server_key,
             "salt": session['salt'],
             "ic": self.IC
         }
         
         return_value = {
-            "secret_server_key": Utils.hex(Utils.bitwise_xor(Utils.unhex(server_key), session['shared_key'])),
-            "secret_client_key": Utils.hex(Utils.bitwise_xor(Utils.unhex(client_key), session['shared_key'])),
+            "secret_server_key": Utils.bitwise_xor(Utils.unhex(server_key), session['shared_key']),
+            "secret_client_key": Utils.bitwise_xor(Utils.unhex(client_key), session['shared_key']),
             "nonce": nonce
         }
 
@@ -106,7 +106,7 @@ class Server(object):
 
         record = {
             "stored_key": stored_key,
-            "server_key": Utils.hex(server_server_key),
+            "server_key": server_server_key,
             "salt": salt,
             "ic": self.IC
         }
@@ -122,7 +122,7 @@ class Server(object):
             "server_key": server_key            
         }
 
-    def authentication_pairing(self, username, client_nonce):
+    def auth_pairing(self, username, client_nonce):
         try:
             self.__sessions.start_session(client_nonce)
         except SessionExistsException:
@@ -147,7 +147,7 @@ class Server(object):
             "nonce": nonce
         }
 
-    def authentication_proof(self, client_proof, nonce):    
+    def auth_proof(self, client_proof, nonce):    
         try:
             client_nonce, server_nonce, session = self._get_session(nonce)
         except Exception as e:
@@ -160,9 +160,9 @@ class Server(object):
         client_signature = Scram.signature_generation(record['stored_key'], auth_message)
         server_signature = Scram.signature_generation(record['server_key'], auth_message)
 
-        if Scram.stored_key_generation(Utils.bitwise_xor(Utils.unhex(client_proof), client_signature)) != record['stored_key']:
+        if Scram.stored_key_generation(Utils.bitwise_xor(client_proof, client_signature)) != record['stored_key']:
             raise Exception("Verification failed")
 
         return {
-            "server_signature": Utils.hex(server_signature)
+            "server_signature": server_signature
         }

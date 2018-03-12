@@ -1,6 +1,6 @@
-# Salted Challenge Response Authentication Message - SHA 256 feat. Diffie Hellman
+# Salted Challenge Response Authentication Message - SHA 256 feat. Ephemeral Diffie Hellman Key Exchange
 
-#### Luca Zanolinim, Gianluca Pericoli 
+#### Luca Zanolini, Gianluca Pericoli 
 
 A modified version of SCRAM-SHA256 Authentication 
 
@@ -8,7 +8,7 @@ https://wiki.tools.ietf.org/html/rfc5802
 
 https://tools.ietf.org/html/rfc7677
 
-with Diffie Hellman key exchange
+with Ephemeral Diffie Hellman key exchange
 
 https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange
 
@@ -23,7 +23,7 @@ We have decided to implement this part of the scheme in a way that the User can 
 1. A Client sends its username, a random nonce and his public key to the Server
 2. The Server takes track of the Client's session, storing the received credentials. Then, it sends a random nonce, a random salt, an iteration count (4096) and its public key to the Client. Now both the parties have the shared secret key. 
 3. The Client generates the salted password with PBKDF2+HMAC algorithm sending it to the Server in an encrypted way ( XOR (salted_password, shared secret key) )
-4. The Server decrypts the salted password, generates 2 random nonces ("Client key" and "Server key") which will be sended in an encrypted way to the Client ( XOR ("Slient key"/"Server key", shared secret key) ). These nonces will be used to generate the Client key, the Server key and the stored key by both the parties.
+4. The Server decrypts the salted password, generates 2 random nonces ("Client key" and "Server key") which will be sended in an encrypted way to the Client ( XOR ("Client key"/"Server key", shared secret key) ). These nonces will be used to generate the Client key, the Server key and the stored key by both the parties.
 
 ### Second possibility - User generation by the Server
 
