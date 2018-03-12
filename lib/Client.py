@@ -4,12 +4,22 @@ from Utils import Utils
 import binascii
 
 class Client(object):
-    __dh = None
+    """Client class:
+    It permits to register and authenticate to a Server
+
+    Attributes:
+    __dh: A Diffie Hellman class
+
+    Constants:
+    NONCE_SIZE: nonce size in bits
+    """
+    NONCE_SIZE = 32
 
     def __init__(self):
         self.__dh = DH()
 
     def _check_nonce(self, nonce):
+        """It verifies the correctness of a given nonce"""
         if nonce.count('-')  != 1:
             raise Exception("Wrong nonce")
         try:
@@ -19,10 +29,11 @@ class Client(object):
         return client_nonce, server_nonce
 
     def registration_pairing(self, username, password):
+        """Returns dictionary with username, public key and a random Client nonce"""
         self.__data = {
             "username": username,
             "password": password,
-            "nonce": Utils.nonce(32)
+            "nonce": Utils.nonce(self.NONCE_SIZE)
         }
 
         return {
@@ -32,6 +43,7 @@ class Client(object):
         }
     
     def registration_send_password(self, salt, ic, public_key, nonce):
+        """Returns encrypted salted password and combined nonce, given salt, ic, Server public key and Server nonce by the Server"""
         try:
             self.__data['shared_key'] = self.__dh.shared_secret(public_key)
             client_nonce, server_nonce = self._check_nonce(nonce)
@@ -54,6 +66,7 @@ class Client(object):
         }
     
     def registration_keys_generation(self, secret_server_key, secret_client_key, nonce):
+        """Returns Client key, server key and stored key, given encrypted "Server key" and encrypted "Slient key" and combined nonce"""
         if self.__data['nonce'] != nonce:
             raise Exception("Bad nonce") 
 
@@ -81,7 +94,8 @@ class Client(object):
         return return_value
 
     def auth_pairing(self, username, client_key, server_key):
-        self.__data['nonce'] = Utils.nonce(32)
+        """Returns username and a random Client nonce, given Client key and Server key"""
+        self.__data['nonce'] = Utils.nonce(self.NONCE_SIZE)
         self.__data['username'] = username
         self.__data['client_key'] = client_key
         self.__data['server_key'] = server_key
@@ -93,6 +107,7 @@ class Client(object):
         }
 
     def auth_client_proof_generation(self, nonce, salt, ic):
+        """Returns combined nonce and Client proof, given combined nonce, salt and ic by the Server"""
         try:
             client_nonce, server_nonce = self._check_nonce(nonce)
         except Exception as e:
@@ -111,6 +126,7 @@ class Client(object):
         }
 
     def server_auth(self, server_signature):
+        """Verifies the correctness of the given Server signature"""
         client_server_signature = Scram.signature_generation(self.__data['server_key'], self.__data['auth_message'])
 
         if client_server_signature != server_signature:

@@ -13,7 +13,6 @@ data = client.registration_pairing(username, password)
 data = server.registration_pairing(data['username'], data['client_nonce'],data['public_key'])
 data = client.registration_send_password(data['salt'], data['ic'], data['public_key'], data['nonce'])
 data = server.registration_keys_generation(data['nonce'], data['secret_key'])
-
 data = client.registration_keys_generation(data['secret_server_key'], data['secret_client_key'], data['nonce'])
 
 client_values = data

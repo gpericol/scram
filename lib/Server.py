@@ -4,17 +4,26 @@ from DH import *
 from Session import *
 import binascii
 
-# Pensare se ha senso implementare l'id di sessione con i 2 nonce
 class Server(object):
-    TTL = 10
+    """ Server class:
+    It permits to accept a registration from a Client and authenticate it
+    Constants:
+    NONCE_SIZE: nonce size in bits
+    SALT_SIZE: salt size in bits
+    KEY_SIZE: key size in bits
+    IC: iteration count for pbkdf2-hmac function
+    """
+    NONCE_SIZE = 32
+    SALT_SIZE = 32
+    KEY_SIZE = 32
     IC = 4096
 
     def __init__(self):
         self.__sessions = Session() 
         self.__data = {}
-        self.__dh = DH()
 
     def _get_session(self, nonce):
+        """Returns Client nonce, Server nonce and the current session"""
         if nonce.count('-')  != 1:
             raise Exception("Wrong nonce")
         try:
@@ -26,25 +35,25 @@ class Server(object):
             raise Exception("Wrong nonce")
 
         if session['server_nonce'] != server_nonce:
-            raise Exception("Wrong server nonce")
+            raise Exception("Wrong Server nonce")
 
         return client_nonce, server_nonce, session
 
-    # First possibility - Client-Server registration
-
     def registration_pairing(self, username, client_nonce, public_key):
-        server_nonce =  Utils.nonce(32)
+        """Returns a random salt, ic, Server public key and combined nonce, given Client username, Client nonce and Client public key """
+        dh = DH()        
+        server_nonce =  Utils.nonce(self.NONCE_SIZE)
         nonce = client_nonce + "-" + server_nonce
         
         try:
             self.__sessions.start_session(client_nonce)
-            shared_key = self.__dh.shared_secret(public_key)
+            shared_key = dh.shared_secret(public_key)
         except SessionExistsException:
             raise Exception("Session already exists")
         except DHBadKeyException:
             raise Exception("Wrong public key")
 
-        salt = Utils.nonce(32)
+        salt = Utils.nonce(self.SALT_SIZE)
 
         self.__sessions.set_session(client_nonce,{
             'username': username,
@@ -56,11 +65,12 @@ class Server(object):
         return {
             "salt": salt,
             "ic": self.IC,
-            "public_key": format(self.__dh.public_key(), 'x'),
+            "public_key": format(dh.public_key(), 'x'),
             "nonce": nonce
         }
 
     def registration_keys_generation(self, nonce, secret_key):
+        """Returns encrypted "Client key", encrypted "Server key" and combined nonce and delete the session"""
         try:
             client_nonce,server_nonce,session = self._get_session(nonce)
         except Exception as e:
@@ -68,11 +78,11 @@ class Server(object):
         
         salted_password = Utils.bitwise_xor(secret_key, session['shared_key'])
         
-        client_key = Utils.nonce(32)
-        server_key = Utils.nonce(32)
+        client_key = Utils.key_generation(self.KEY_SIZE)
+        server_key = Utils.key_generation(self.KEY_SIZE)
 
-        server_client_key = Utils.hmac_generation(salted_password, Utils.unhex(client_key))
-        server_server_key = Utils.hmac_generation(salted_password, Utils.unhex(server_key))
+        server_client_key = Utils.hmac_generation(salted_password, client_key)
+        server_server_key = Utils.hmac_generation(salted_password, server_key)
         
         stored_key = Scram.stored_key_generation(server_client_key)
 
@@ -85,8 +95,8 @@ class Server(object):
         }
         
         return_value = {
-            "secret_server_key": Utils.bitwise_xor(Utils.unhex(server_key), session['shared_key']),
-            "secret_client_key": Utils.bitwise_xor(Utils.unhex(client_key), session['shared_key']),
+            "secret_server_key": Utils.bitwise_xor(server_key, session['shared_key']),
+            "secret_client_key": Utils.bitwise_xor(client_key, session['shared_key']),
             "nonce": nonce
         }
 
@@ -95,13 +105,14 @@ class Server(object):
         return return_value
 
     def generate_user(self, username):
+        """Returns Client username, Client password, random salt, ic, Client key and Server Key, given Client username"""
         password = Utils.generate_password()
-        salt = Utils.nonce(32)
+        salt = Utils.nonce(self.SALT_SIZE)
         salted_password = Scram.salted_password(password, salt, self.IC)
-        client_key = Utils.nonce(32)
-        server_key = Utils.nonce(32)
-        server_client_key = Utils.hmac_generation(salted_password, Utils.unhex(client_key))
-        server_server_key = Utils.hmac_generation(salted_password, Utils.unhex(server_key))
+        client_key = Utils.key_generation(self.KEY_SIZE)
+        server_key = Utils.key_generation(self.KEY_SIZE)
+        server_client_key = Utils.hmac_generation(salted_password, client_key)
+        server_server_key = Utils.hmac_generation(salted_password, server_key)
         stored_key = Scram.stored_key_generation(server_client_key)
 
         record = {
@@ -123,6 +134,7 @@ class Server(object):
         }
 
     def auth_pairing(self, username, client_nonce):
+        """Returns random salt, ic and combine nonce, given Client username and Client nonce"""
         try:
             self.__sessions.start_session(client_nonce)
         except SessionExistsException:
@@ -131,9 +143,9 @@ class Server(object):
         if self.__data.has_key('username'):
             raise Exception("Wrong username")
 
-        server_nonce =  Utils.nonce(32)
+        server_nonce =  Utils.nonce(self.NONCE_SIZE)
         nonce = client_nonce + "-" + server_nonce
-        salt = Utils.nonce(32)
+        salt = Utils.nonce(self.SALT_SIZE)
 
         self.__sessions.set_session(client_nonce, {
             'username': username,
@@ -147,7 +159,8 @@ class Server(object):
             "nonce": nonce
         }
 
-    def auth_proof(self, client_proof, nonce):    
+    def auth_proof(self, client_proof, nonce):   
+        """Returns Server signature given Client proof and combined nonce""" 
         try:
             client_nonce, server_nonce, session = self._get_session(nonce)
         except Exception as e:
